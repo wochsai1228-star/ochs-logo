@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Legenix Chatbot</title>
+  </head>
+  <body>
+    <script>
+      <!-- RB Chat Widget (Shadow DOM, self-contained) -->
+<script>
+(() => {
+  /* ======== CONFIG (edit these) ======== */
+  const CONFIG = {
+    COMPANY_NAME: 'Legenix Demo Chat',
+    COMPANY_URL: 'https://yourcompany.com',
+    PRIVACY_URL: 'https://yourcompany.com/privacy',
+    BRAND_LINK: 'https://legenix.ai',
+    INITIAL_MESSAGES: ["Hi! This is a demo version of the chatbot you'll have on your website. Pretend you're a client in need of legal representation and see how it reacts!", "This is Legenix Law Firm's confidential chat. How may we help you today?"],
+    WEBHOOK_URL: 'https://n8n.legenix.com/webhook/965364b1-10e6-4044-a839-35f8b054cd5d/chat',
+    SEND_PLAIN_TEXT: false
+  };
+  const ASSETS = {
+    HEADER_LOGO_URL: 'https://raw.githubusercontent.com/wochsai1228-star/ochs-logo/refs/heads/main/Exylis%20AI.svg',
+    LAUNCHER_LOGO_URL: 'https://i.ibb.co/6RF37NMK/chat.png',
+    SEND_BUTTON_LOGO_URL: 'https://raw.githubusercontent.com/wochsai1228-star/ochs-logo/refs/heads/main/Exylis%20AI%20(1).svg',
+    BRAND_LOGO_URL: 'https://raw.githubusercontent.com/wochsai1228-star/ochs-logo/refs/heads/main/Exylis%20AI%20(5).svg',
+    AI_AVATAR_URL: 'https://raw.githubusercontent.com/wochsai1228-star/ochs-logo/refs/heads/main/Exylis%20AI.svg',
+  };
+  /* ===================================== */
+  class RBChatWidget extends HTMLElement {
+    constructor(){
+      super();
+      this.attachShadow({mode:'open'});
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host{ all: initial; }
+          .rb-root{
+            --rb-teal:#48C3C3; --rb-bg:#0f0f10; --rb-card:#ffffff; --rb-bubble:#f5f5f6;
+            --rb-shadow:0 12px 30px rgba(0,0,0,.28);
+            --rb-radius: clamp(14px, 2.4vw, 22px);
+            --rb-pad: clamp(10px, 1.8vw, 16px);
+            all: initial;
+            font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            color: #111;
+          }
+          .rb-root *, .rb-root *::before, .rb-root *::after{ box-sizing: border-box; }
+          /* launcher */
+          .rb-launcher{
+            position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));
+            width:62px;height:62px;border-radius:50%;background:var(--rb-teal);
+            box-shadow:var(--rb-shadow);display:grid;place-items:center;cursor:pointer;z-index:2147483646;
+            touch-action:manipulation; user-select:none;
+          }
+          .icon-28{width:28px;height:28px;display:block}
+          .launcher-x{
+            display:none; font-size:23px; line-height:1; color:#111;
+          }
+          .rb-launcher.open .launcher-x{ display:block; }
+          .rb-launcher.open #logo-launcher{ display:none; }
+          .rb-welcome{
+            position:fixed;right:16px;bottom:calc(86px + env(safe-area-inset-bottom,0px));
+            background:#fff;color:#111;padding:12px 14px;border-radius:12px;box-shadow:var(--rb-shadow);
+            font-size:14px;max-width:min(35vw,320px);z-index:2147483645;line-height:1.3;
+          }
+          .rb-welcome.hide{display:none}
+          .rb-welcome:after{content:"";position:absolute;bottom:-10px;right:20px;border:10px solid transparent;border-top-color:#fff;filter:drop-shadow(0 3px 6px rgba(0,0,0,.12))}
+          .rb-overlay{
+            position:fixed;inset:0;background:rgba(0,0,0,.25);opacity:0;visibility:hidden;transition:.18s ease;z-index:2147483644
+          }
+          .rb-overlay.open{opacity:1;visibility:visible}
+          .rb-chat{
+            position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px));
+            width:clamp(430px, 92vw, 430px);
+            height:min(87vh, 640px);
+            height:min(87dvh, 640px);
+            background:#fff;border-radius:var(--rb-radius);overflow:hidden;box-shadow:var(--rb-shadow);
+            display:flex;flex-direction:column;z-index:2147483647;transform:translateY(16px) scale(.98);
+            opacity:0;pointer-events:none;transition:transform .18s ease, opacity .18s ease;
+          }
+          .rb-chat.open{transform:translateY(0) scale(1);opacity:1;pointer-events:auto}
+          .img-contain{width:100%;height:100%;object-fit:contain;image-rendering:-webkit-optimize-contrast}
+          /* Header */
+          .rb-head{background:var(--rb-card);padding:calc(var(--rb-pad) + env(safe-area-inset-top,0px)) var(--rb-pad) var(--rb-pad);display:flex;justify-content:space-between;align-items:center;position:relative}
+          .rb-head > div { position:absolute;top:0;bottom:0;left:0;right:0;display:flex;justify-content:center;align-items:center;pointer-events:none; }
+          .rb-logo{width:30px;height:30px;border-radius:7px;background:#fff;border:1px solid #e8e8e8;display:grid;place-items:center;overflow:hidden;flex:0 0 30px}
+          .rb-title{margin:0;font-size:clamp(14px,2.4vw,17px);font-weight:700;color:#111}
+          .rb-sub{margin:4px 0;font-size:12px;color:#444;text-align:center}
+          .rb-sub a{color:#2d6cdf;text-decoration:none}
+          .rb-sub a:hover{text-decoration:underline}
+          .rb-close{background:transparent;border:0;cursor:pointer;font-size:18px;line-height:1;touch-action:manipulation;color:#111;width:30px;height:30px;display:flex;justify-content:center;align-items:center}
+          /* Body */
+          .rb-body{
+            flex:1;min-height:0;overflow:auto;background:#fff;padding:10px 8px;
+            /* hide scrollbars cross-browser */
+            scrollbar-width:none; -ms-overflow-style:none;
+          }
+          .rb-body::-webkit-scrollbar{ display:none; }
+          /* Bubbles */
+          .row{display:flex;gap:10px;margin:10px 0}
+          .row.bot{justify-content:flex-start}
+          .row.user{justify-content:flex-end}
+          .bubble{
+            max-width:75%;
+            background:#efefef;color:#111;border-radius:14px;padding:12px 14px;line-height:1.35;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere;
+            font-size: 14px;
+          }
+          .row.bot .bubble{background:var(--rb-bubble);border-top-left-radius:6px}
+          .row.user .bubble{background:var(--rb-teal);color:white;border-top-right-radius:6px}
+          .avatar{width:26px;height:26px;border-radius:6px;background:#fff;border:1px solid #e8e8e8;display:grid;place-items:center;overflow:hidden;flex:0 0 26px}
+          /* Chips */
+          .chips{display:flex;gap:10px;flex-wrap:wrap;padding:0 12px 8px;max-width:100%}
+          .chip{background:#f2f2f3;border:1px solid #e8e8e8;border-radius:999px;padding:8px 12px;font-size:13px;cursor:pointer;white-space:nowrap}
+          /* Footer (send button inside input) */
+          .rb-foot{background:var(--rb-card);padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));border-top:1px solid #e5e5e5}
+          .composer{display:flex;align-items:center}
+          .input-row{
+            flex:1;display:flex;align-items:center;background:#fff;border:1px solid #d9d9d9;border-radius:24px;
+            padding:6px 8px 6px 14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.65), 0 1px 2px rgba(0,0,0,.04)
+          }
+          .input-row:focus-within {
+            border-color: #ffffff;
+            box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8);
+          }
+          .input-row input{
+            border:none;outline:none;background:transparent;flex:1;font-size:14px;color:#111;min-height:24px;
+          }
+          .input-row input::placeholder{color:#9aa0a6}
+          .send{
+            width:36px;height:36px;border-radius:12px;background:#fff;border:1px solid #d9d9d9;
+            display:grid;place-items:center;cursor:pointer;overflow:hidden;flex:0 0 36px;touch-action:manipulation;margin-left:8px;
+          }
+          .icon-22{width:20px;height:20px;display:block}
+          .icon-18{width:50px;height:15px;display:inline-block;vertical-align:-4px}
+          .brand{margin:4px 0 0;text-align:center;font-size:10px;color:#222}
+          .brand .brand-link{font-weight:700;letter-spacing:.6px;text-decoration:none;color:#111}
+          .brand .brand-link:hover{text-decoration:underline}
+          /* typing */
+          .typing-bubble{display:flex;gap:6px;align-items:center}
+          .typing-bubble .dot{width:6px;height:6px;border-radius:50%;background:#9a9a9a;opacity:.3;animation:rb-blink 1s infinite}
+          .typing-bubble .dot:nth-child(2){animation-delay:.15s}
+          .typing-bubble .dot:nth-child(3){animation-delay:.3s}
+          @keyframes rb-blink{0%{opacity:.2;transform:translateY(0)}20%{opacity:1;transform:translateY(-2px)}100%{opacity:.2;transform:translateY(0)}}
+          /* Phone full-screen */
+          @media (max-width: 520px){
+            .rb-welcome{display:block;right:16px;bottom:calc(86px + env(safe-area-inset-bottom,0px));max-width:72vw}
+            .rb-chat{
+              right:0;left:0;bottom:0;top:0;width:100vw;height:100vh;height:100dvh;border-radius:0; transform:none; opacity:0;
+            }
+            .rb-chat.open{opacity:1}
+            .rb-head{padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px}
+            .rb-foot{padding:10px 10px calc(10px + env(safe-area-inset-bottom,0px))}
+            .send{width:36px;height:36px;border-radius:10px}
+            .bubble{max-width:85%}
+            .brand{font-size:12px}
+          }
+          @media (max-width: 360px){ .brand{display:none} }
+          @media (prefers-reduced-motion: reduce){
+            .rb-overlay, .rb-chat{transition:none}
+            .typing-bubble .dot{animation:none}
+          }
+        </style>
+        <div class="rb-root">
+          <div class="rb-launcher" id="rb-launcher" aria-controls="rb-chat" aria-expanded="false" title="Chat">
+            <img id="logo-launcher" class="icon-28" alt="Open chat" referrerpolicy="no-referrer"/>
+            <span class="launcher-x" id="launcher-x" aria-hidden="true">✕</span>
+          </div>
+          <div class="rb-welcome" id="rb-welcome">Test out our chatbot right here!</div>
+          <div class="rb-overlay" id="rb-overlay"></div>
+          <section class="rb-chat" id="rb-chat" role="dialog" aria-modal="true" aria-labelledby="rb-title">
+            <header class="rb-head">
+              <a class="rb-logo" id="header-link" href="#" target="_blank" rel="noopener" aria-label="Company home">
+                <img id="logo-header" class="img-contain" alt="Company logo" referrerpolicy="no-referrer"/>
+              </a>
+              <div>
+                <h2 class="rb-title" id="rb-title"></h2>
+              </div>
+              <button class="rb-close" id="rb-close" aria-label="Close">✕</button>
+            </header>
+            <main class="rb-body" id="rb-body" aria-live="polite"></main>
+            <div class="chips" id="rb-chips" aria-label="Quick suggestions">
+              <div class="chip">I need a lawyer</div>
+              <div class="chip">Can I trust Legenix Law Firm?</div>
+            </div>
+            <footer class="rb-foot">
+              <div class="composer">
+                <div class="input-row">
+                  <input id="rb-input" placeholder="Type a new message…" autocomplete="off" />
+                  <button class="send" id="rb-send" title="Send" aria-label="Send" type="button">
+                    <img id="logo-send" class="icon-22" alt="Send" referrerpolicy="no-referrer"/>
+                  </button>
+                </div>
+              </div>
+              <p class="rb-sub">This conversation is secure and confidential.
+                <a id="privacy-link" href="#" target="_blank" rel="noopener">Privacy policy</a>
+              </p>
+              <div class="brand">
+                Created with
+                <a class="brand-link" id="rb-brand-link" href="#" target="_blank" rel="noopener">
+                  <img id="logo-brand" class="icon-18" alt="Exylis AI" referrerpolicy="no-referrer"/>
+                </a>
+              </div>
+            </footer>
+          </section>
+        </div>
+      `;
+      /* ===== Script (scoped) ===== */
+      const $ = (id) => this.shadowRoot.getElementById(id);
+      // apply config
+      $('rb-title').textContent = CONFIG.COMPANY_NAME;
+      $('header-link').href = CONFIG.COMPANY_URL;
+      $('privacy-link').href = CONFIG.PRIVACY_URL;
+      $('rb-brand-link').href = CONFIG.BRAND_LINK;
+      const setSrc = (id, url, fallback) => {
+        const el = $(id);
+        if (!el) return;
+        el.src = url;
+        el.decoding = 'async';
+        el.loading = 'eager';
+        el.onerror = () => { if (fallback) el.replaceWith(document.createTextNode(fallback)); };
+      };
+      setSrc('logo-header', ASSETS.HEADER_LOGO_URL, '◇');
+      setSrc('logo-launcher',ASSETS.LAUNCHER_LOGO_URL,'💬');
+      setSrc('logo-send', ASSETS.SEND_BUTTON_LOGO_URL,'➤');
+      setSrc('logo-brand', ASSETS.BRAND_LOGO_URL, '');
+      // session id
+      let sessionId = null;
+      const generateSessionId = () => {
+        return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
+      };
+      const chat=$('rb-chat'), overlay=$('rb-overlay'), launcher=$('rb-launcher'),
+            welcome=$('rb-welcome'), bodyEl=$('rb-body'), inputEl=$('rb-input'),
+            sendBtn=$('rb-send'), chips=$('rb-chips');
+      let booted=false, typingRow=null;
+      let firstMessageSent = false;
+      const makeAIBadge = () => {
+        const wrap = document.createElement('div'); wrap.className='avatar';
+        const img = new Image(); img.className='img-contain'; img.alt='AI'; img.referrerPolicy='no-referrer'; img.src=ASSETS.AI_AVATAR_URL;
+        img.onerror=()=>{ wrap.textContent='AI'; };
+        wrap.appendChild(img);
+        return wrap;
+      };
+      const addMsg = (text, who='bot') => {
+        const row = document.createElement('div'); row.className = `row ${who}`;
+        const bubble = document.createElement('div'); bubble.className='bubble'; bubble.textContent=String(text);
+        if (who==='bot') row.appendChild(makeAIBadge());
+        row.appendChild(bubble);
+        bodyEl.appendChild(row);
+        bodyEl.scrollTop = bodyEl.scrollHeight;
+      };
+      const updateLauncherIcon = () => {
+        if (chat.classList.contains('open')) {
+          launcher.classList.add('open');
+          launcher.setAttribute('aria-label','Close chat');
+          launcher.setAttribute('title','Close chat');
+          launcher.setAttribute('aria-expanded','true');
+        } else {
+          launcher.classList.remove('open');
+          launcher.setAttribute('aria-label','Open chat');
+          launcher.setAttribute('title','Open chat');
+          launcher.setAttribute('aria-expanded','false');
+        }
+      };
+      const openChat = () => {
+        chat.classList.add('open'); overlay.classList.add('open');
+        if(welcome) welcome.classList.add('hide');
+        if(!booted){ (CONFIG.INITIAL_MESSAGES||[]).forEach(t=>addMsg(t,'bot')); booted=true; }
+        updateLauncherIcon();
+        setTimeout(()=>inputEl && inputEl.focus(),50);
+      };
+      const closeChat = () => {
+        chat.classList.remove('open'); overlay.classList.remove('open');
+        updateLauncherIcon();
+      };
+      const showTyping = () => {
+        if (typingRow) return;
+        typingRow = document.createElement('div'); typingRow.className='row bot';
+        const bubble = document.createElement('div'); bubble.className='bubble typing-bubble';
+        bubble.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+        typingRow.appendChild(makeAIBadge()); typingRow.appendChild(bubble);
+        bodyEl.appendChild(typingRow);
+        bodyEl.scrollTop = bodyEl.scrollHeight;
+      };
+      const hideTyping = () => { if(!typingRow) return; typingRow.remove(); typingRow=null; };
+      const parseReply = async (resp) => {
+        const ct = resp.headers.get('content-type')||'';
+        if(ct.includes('application/json')){
+          const j = await resp.json();
+          return j.reply||j.text||j.message||j.output||(j.data&&(j.data.text||j.data.reply))||JSON.stringify(j);
+        }
+        return await resp.text();
+      };
+      const sendToWebhook = (text) => {
+        const headers={'Accept':'*/*'};
+        let body;
+        if(CONFIG.SEND_PLAIN_TEXT){ headers['Content-Type']='text/plain'; body=text; }
+        else { headers['Content-Type']='application/json'; body=JSON.stringify({chatInput:text, sessionId}); }
+        return fetch(CONFIG.WEBHOOK_URL,{method:'POST',headers,body});
+      };
+      const setBusy = (b)=>{ inputEl.disabled=b; sendBtn.disabled=b; };
+      const doSend = async () => {
+        const text=(inputEl.value||'').trim(); if(!text) return;
+        addMsg(text,'user'); inputEl.value=''; setBusy(true); showTyping();
+        if (!sessionId) {
+          sessionId = generateSessionId();
+        }
+        if (!firstMessageSent) {
+          firstMessageSent = true;
+          chips.style.display = 'none';
+        }
+        try{
+          const resp=await sendToWebhook(text);
+          const reply=await parseReply(resp);
+          hideTyping(); addMsg(String(reply||'…'),'bot');
+        }catch(e){
+          hideTyping(); addMsg("Sorry—couldn’t reach the server. Please try again.",'bot');
+          console.error(e);
+        }finally{
+          setBusy(false); inputEl.focus();
+        }
+      };
+      // events
+      const toggleChat = ()=> chat.classList.contains('open') ? closeChat() : openChat();
+      launcher.addEventListener('click', toggleChat);
+      $('rb-close').addEventListener('click', closeChat);
+      overlay.addEventListener('click', closeChat);
+      this.shadowRoot.addEventListener('keydown', e=>{ if(e.key==='Escape') closeChat(); });
+      sendBtn.addEventListener('click', doSend);
+      inputEl.addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); doSend(); } });
+      chips.addEventListener('click', e=>{
+        const chip = e.target.closest('.chip'); if(!chip) return;
+        inputEl.value = chip.textContent.trim(); doSend();
+      });
+      inputEl.addEventListener('focus', () => { inputEl.placeholder = ''; });
+      inputEl.addEventListener('blur', () => { if (!inputEl.value.trim()) inputEl.placeholder = 'Type a new message…'; });
+      // welcome bubble timeout + ?chat=1 support
+      try{
+        const qs = new URLSearchParams(window.location.search);
+        if(qs.get('chat')==='1') openChat(); else updateLauncherIcon();
+      }catch{
+        updateLauncherIcon();
+      }
+    }
+  }
+  customElements.define('rb-chat-widget', RBChatWidget);
+  const mount = () => {
+    if (document.body && !document.querySelector('rb-chat-widget')) {
+      document.body.appendChild(document.createElement('rb-chat-widget'));
+    } else if (!document.body) {
+      document.addEventListener('DOMContentLoaded', mount, {once:true});
+    }
+  };
+  mount();
+})();
+</script>
+    </script>
+  </body>
+</html>
